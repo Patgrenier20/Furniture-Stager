@@ -3,7 +3,9 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useCreateProject, useGetMe } from "@workspace/api-client-react";
+import { useGetMe, customFetch } from "@workspace/api-client-react";
+import { useMutation } from "@tanstack/react-query";
+import type { Project } from "@workspace/api-client-react";
 import { DashboardLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -21,7 +23,10 @@ const formSchema = z.object({
 export default function NewProject() {
   const [, setLocation] = useLocation();
   const { data: user } = useGetMe();
-  const createProject = useCreateProject();
+  const createProject = useMutation({
+    mutationFn: (formData: FormData) =>
+      customFetch<Project>("/api/projects", { method: "POST", body: formData }),
+  });
   const { toast } = useToast();
   
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -64,7 +69,7 @@ export default function NewProject() {
     if (values.description) formData.append("description", values.description);
     formData.append("image", imageFile);
 
-    createProject.mutate({ data: formData as any }, {
+    createProject.mutate(formData, {
       onSuccess: (project) => {
         toast({ title: "Project created", description: "Taking you to the studio..." });
         setLocation(`/projects/${project.id}`);
