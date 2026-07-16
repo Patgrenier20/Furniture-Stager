@@ -5,7 +5,11 @@
  * FurniFlip API - AI-powered furniture photo editing and ad generation
  * OpenAPI spec version: 0.1.0
  */
+import type { Project } from './project';
 
-export interface HealthStatus {
-  status: string;
+export interface ProjectStats {
+  totalProjects: number;
+  totalImages: number;
+  totalAds: number;
+  recentProjects: Project[];
 }
