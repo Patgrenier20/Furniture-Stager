@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "FurniFlip — AI Photo Studio"
+version = "1.0.0"
+id = "artifacts/furniture-flip"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18209
+
+[services.development]
+run = "pnpm --filter @workspace/furniture-flip run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/furniture-flip", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/furniture-flip/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18209"
+BASE_PATH = "/"
