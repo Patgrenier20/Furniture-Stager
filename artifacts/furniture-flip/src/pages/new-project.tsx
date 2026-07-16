@@ -122,7 +122,7 @@ export default function NewProject() {
                 </div>
 
                 <div className="space-y-4">
-                  <FormLabel className="block">Original Photo</FormLabel>
+                  <label className="block text-sm font-medium leading-none">Original Photo</label>
                   {previewUrl ? (
                     <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-border group">
                       <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
