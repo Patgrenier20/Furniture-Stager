@@ -1,11 +1,9 @@
 import multer from "multer";
 import path from "path";
-import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 import fs from "fs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, "..", "..", "uploads");
+const uploadsDir = path.join(process.cwd(), "uploads");
 
 // Ensure uploads directory exists
 if (!fs.existsSync(uploadsDir)) {

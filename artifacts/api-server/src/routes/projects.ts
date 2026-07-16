@@ -6,9 +6,8 @@ import { upload } from "../lib/multer";
 
 const router: IRouter = Router();
 
-function getImageUrl(req: { protocol: string; get: (h: string) => string | undefined }, filename: string): string {
-  const host = req.get("host") ?? "localhost";
-  return `${req.protocol}://${host}/api/uploads/${filename}`;
+function getImageUrl(_req: unknown, filename: string): string {
+  return `/api/uploads/${filename}`;
 }
 
 router.get("/projects", requireAuth, async (req, res): Promise<void> => {

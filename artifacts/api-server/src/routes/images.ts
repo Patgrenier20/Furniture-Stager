@@ -6,17 +6,14 @@ import { checkAndIncrementUsage } from "../lib/usage";
 import { openai } from "../lib/openai";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, "..", "..", "uploads");
+const uploadsDir = path.join(process.cwd(), "uploads");
 
 const router: IRouter = Router();
 
-function getImageUrl(req: { protocol: string; get: (h: string) => string | undefined }, filename: string): string {
-  const host = req.get("host") ?? "localhost";
-  return `${req.protocol}://${host}/api/uploads/${filename}`;
+function getImageUrl(_req: unknown, filename: string): string {
+  return `/api/uploads/${filename}`;
 }
 
 async function downloadImageToBuffer(imageUrl: string): Promise<Buffer> {
