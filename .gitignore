@@ -1,0 +1,74 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+/output/
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/.codex-preview/
+/.agents/
+/.codex/
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# environment files
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Local tool state
+.cache/
+.local/
+
+# Local embedded PostgreSQL data used when DATABASE_URL is not configured
+.local-data/
+
+# Runtime user uploads and generated test data
+/artifacts/api-server/uploads/
+/artifacts/uploads/
+/attached_assets/
+.test-data/
+
+# Private company planning and generated reports
+/docs/
+/docs - Copy/
+/private/
+/*.pdf
+/*.zip

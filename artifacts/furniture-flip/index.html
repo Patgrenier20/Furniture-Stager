@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>FurniFlip - Furniture Photo Studio</title>
+    <meta name="description" content="Prepare polished furniture listing photos and marketplace copy with an AI-assisted workflow." />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="FurniFlip - Furniture Photo Studio" />
+    <meta property="og:description" content="Prepare polished furniture listing photos and marketplace copy with an AI-assisted workflow." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FurniFlip - Furniture Photo Studio" />
+    <meta name="twitter:description" content="Prepare polished furniture listing photos and marketplace copy with an AI-assisted workflow." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!--
+      Preload the desktop LCP image only when login is the initial route.
+      A static link here would also preload it on unrelated SPA routes, where
+      it is intentionally unused and causes the browser preload warning.
+    -->
+    <script>
+      if (
+        window.matchMedia('(min-width: 768px)').matches &&
+        /\/login\/?$/.test(window.location.pathname)
+      ) {
+        const preload = document.createElement('link');
+        const routeBase = window.location.pathname.replace(/\/login\/?$/, '');
+
+        preload.rel = 'preload';
+        preload.as = 'image';
+        preload.type = 'image/avif';
+        preload.fetchPriority = 'high';
+        preload.href = `${routeBase}/login-hero.avif`;
+        document.head.appendChild(preload);
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
