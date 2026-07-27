@@ -52,7 +52,7 @@ export function encryptSecret(plaintext: string | null | undefined): string | nu
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
-  return `${iv.toString("base64")}:${authTag.toString("base64")}:${ciphertext.toString("base64")}`;
+  return `enc:v1:${iv.toString("base64")}:${authTag.toString("base64")}:${ciphertext.toString("base64")}`;
 }
 
 /**
@@ -71,11 +71,11 @@ export function decryptSecret(stored: string | null | undefined): string | null 
   if (!stored) return null;
 
   const parts = stored.split(":");
-  if (parts.length !== 3) {
+  if (parts.length !== 5 || parts[0] !== "enc" || parts[1] !== "v1") {
     return stored;
   }
 
-  const [ivB64, authTagB64, ciphertextB64] = parts;
+  const [, , ivB64, authTagB64, ciphertextB64] = parts;
 
   try {
     const key = getKey();
