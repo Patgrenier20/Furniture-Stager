@@ -115,25 +115,26 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
     // of re-applying its side effects. onConflictDoNothing makes the
     // check-and-record atomic, so two near-simultaneous deliveries of the
     // same event can't both slip past this check.
-    const [inserted] = await db
-      .insert(billingEventsTable)
-      .values({ stripeEventId: event.id, type: event.type })
-      .onConflictDoNothing()
-      .returning({ id: billingEventsTable.id });
+    let alreadyProcessed = false;
+    await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(billingEventsTable)
+        .values({ stripeEventId: event.id, type: event.type })
+        .onConflictDoNothing()
+        .returning({ id: billingEventsTable.id });
 
-    if (!inserted) {
-      logger.info({ eventId: event.id, eventType: event.type }, "Skipping already-processed Stripe webhook event");
-      res.json({ received: true });
-      return;
-    }
+      if (!inserted) {
+        alreadyProcessed = true;
+        return;
+      }
 
-    switch (event.type) {
+      switch (event.type) {
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as { customer: string; id: string; status: string };
         const customerId = subscription.customer;
         if (subscription.status === "active" || subscription.status === "trialing") {
-          await db
+          await tx
             .update(usersTable)
             .set({ plan: "pro", stripeSubscriptionId: subscription.id })
             .where(eq(usersTable.stripeCustomerId, customerId as string));
@@ -143,7 +144,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
       case "customer.subscription.deleted": {
         const subscription = event.data.object as { customer: string };
         const customerId = subscription.customer;
-        await db
+        await tx
           .update(usersTable)
           .set({ plan: "free", stripeSubscriptionId: null })
           .where(eq(usersTable.stripeCustomerId, customerId as string));
@@ -163,7 +164,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
         if (session.mode === "subscription" && session.customer && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription);
           if (subscription.status === "active" || subscription.status === "trialing") {
-            await db
+            await tx
               .update(usersTable)
               .set({ plan: "pro", stripeSubscriptionId: subscription.id })
               .where(eq(usersTable.stripeCustomerId, session.customer));
@@ -171,8 +172,12 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
         }
         break;
       }
-    }
+      }
+    });
 
+    if (alreadyProcessed) {
+      logger.info({ eventId: event.id, eventType: event.type }, "Skipping already-processed Stripe webhook event");
+    }
     res.json({ received: true });
   } catch (err) {
     logger.error({ err }, "Webhook processing failed");
