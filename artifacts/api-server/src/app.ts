@@ -89,7 +89,7 @@ app.use(
 // this exact path never reach express.json() or the router at all.
 app.post(
   "/api/subscriptions/webhook",
-  express.raw({ type: "application/json" }),
+  express.raw({ type: "application/json", limit: "1mb" }),
   handleStripeWebhook,
 );
 
