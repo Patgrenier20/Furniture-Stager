@@ -48,7 +48,9 @@ async function getImageClientForUser(userId: number) {
     .from(usersTable)
     .where(eq(usersTable.id, userId));
 
-  const apiKey = decryptSecret(user?.openaiApiKey) ?? process.env.OPENAI_API_KEY;
+  const apiKey = user?.openaiApiKey
+    ? decryptSecret(user.openaiApiKey)
+    : process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("missing_openai_key");
   }
