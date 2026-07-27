@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { checkAndIncrementUsage } from "../lib/usage";
 import { createOpenAIClient } from "../lib/openai";
+import { decryptSecret } from "../lib/crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
@@ -47,7 +48,7 @@ async function getImageClientForUser(userId: number) {
     .from(usersTable)
     .where(eq(usersTable.id, userId));
 
-  const apiKey = user?.openaiApiKey ?? process.env.OPENAI_API_KEY;
+  const apiKey = decryptSecret(user?.openaiApiKey) ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("missing_openai_key");
   }
