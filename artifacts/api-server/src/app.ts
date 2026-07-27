@@ -10,6 +10,7 @@ import pinoHttp from "pino-http";
 import session from "express-session";
 import path from "path";
 import router from "./routes";
+import { handleStripeWebhook } from "./routes/subscriptions";
 import { logger } from "./lib/logger";
 import { requireAuth } from "./middlewares/requireAuth";
 
@@ -79,6 +80,17 @@ app.use(
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }),
+);
+
+// Stripe's webhook signature check needs the exact raw bytes of the request
+// body, so this route is registered ahead of the global express.json()
+// parser below (and is not part of the /api router, which sits behind it).
+// Express stops at the first route that sends a response, so requests to
+// this exact path never reach express.json() or the router at all.
+app.post(
+  "/api/subscriptions/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook,
 );
 
 app.use(express.json({ limit: "1mb" }));
