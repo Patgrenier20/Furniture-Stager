@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -85,7 +85,19 @@ router.post("/subscriptions/portal", requireAuth, async (req, res): Promise<void
   }
 });
 
-router.post("/subscriptions/webhook", async (req, res): Promise<void> => {
+/**
+ * Stripe requires the raw, unparsed request body bytes to verify the
+ * `Stripe-Signature` header (`stripe.webhooks.constructEvent` computes an
+ * HMAC over the exact bytes Stripe sent). The API server's global
+ * `express.json()` middleware in `app.ts` parses every request body into a
+ * JS object before routes ever see it, which would make signature
+ * verification fail on every real Stripe delivery. To avoid that, this
+ * handler is NOT registered on `router` (which sits behind the global JSON
+ * parser). Instead, `app.ts` mounts it directly on the Express app, ahead of
+ * `express.json()`, paired with `express.raw({ type: "application/json" })`
+ * so `req.body` is still a `Buffer` by the time it reaches here.
+ */
+export async function handleStripeWebhook(req: Request, res: Response): Promise<void> {
   if (!STRIPE_WEBHOOK_SECRET || !STRIPE_SECRET_KEY) {
     res.status(200).json({ received: true });
     return;
@@ -101,7 +113,7 @@ router.post("/subscriptions/webhook", async (req, res): Promise<void> => {
       case "customer.subscription.updated": {
         const subscription = event.data.object as { customer: string; id: string; status: string };
         const customerId = subscription.customer;
-        if (subscription.status === "active") {
+        if (subscription.status === "active" || subscription.status === "trialing") {
           await db
             .update(usersTable)
             .set({ plan: "pro", stripeSubscriptionId: subscription.id })
@@ -118,6 +130,28 @@ router.post("/subscriptions/webhook", async (req, res): Promise<void> => {
           .where(eq(usersTable.stripeCustomerId, customerId as string));
         break;
       }
+      case "checkout.session.completed": {
+        // Defensive fallback: Stripe does not strictly guarantee that
+        // `customer.subscription.created` arrives before or after
+        // `checkout.session.completed`. If the subscription event is ever
+        // delayed, dropped, or processed out of order, this ensures the
+        // user is still upgraded as soon as checkout finishes.
+        const session = event.data.object as {
+          mode: string;
+          customer: string | null;
+          subscription: string | null;
+        };
+        if (session.mode === "subscription" && session.customer && session.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription);
+          if (subscription.status === "active" || subscription.status === "trialing") {
+            await db
+              .update(usersTable)
+              .set({ plan: "pro", stripeSubscriptionId: subscription.id })
+              .where(eq(usersTable.stripeCustomerId, session.customer));
+          }
+        }
+        break;
+      }
     }
 
     res.json({ received: true });
@@ -125,6 +159,6 @@ router.post("/subscriptions/webhook", async (req, res): Promise<void> => {
     logger.error({ err }, "Webhook processing failed");
     res.status(400).json({ error: "Webhook error" });
   }
-});
+}
 
 export default router;
