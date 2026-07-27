@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, projectsTable, editedImagesTable, adsTable } from "@workspace/db";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { upload } from "../lib/multer";
 import { unlink } from "node:fs/promises";
@@ -33,36 +33,42 @@ async function deleteUploadedImage(imageUrl: string | null): Promise<void> {
 router.get("/projects", requireAuth, async (req, res): Promise<void> => {
   const userId = req.session.userId!;
 
-  const projects = await db
-    .select()
+  // A single grouped join replaces what used to be 1 + 2N queries (one
+  // query for the project list, then two COUNT queries per project). This
+  // returns the same shape in one round trip to Postgres regardless of how
+  // many projects the user has. Counting DISTINCT ids is required because
+  // the left joins otherwise multiply rows (a project with 3 images and 2
+  // ads would produce 6 joined rows, one per image/ad combination).
+  const projectsWithCounts = await db
+    .select({
+      id: projectsTable.id,
+      userId: projectsTable.userId,
+      name: projectsTable.name,
+      description: projectsTable.description,
+      originalImageUrl: projectsTable.originalImageUrl,
+      createdAt: projectsTable.createdAt,
+      imageCount: sql<number>`count(distinct ${editedImagesTable.id})`,
+      adCount: sql<number>`count(distinct ${adsTable.id})`,
+    })
     .from(projectsTable)
+    .leftJoin(editedImagesTable, eq(editedImagesTable.projectId, projectsTable.id))
+    .leftJoin(adsTable, eq(adsTable.projectId, projectsTable.id))
     .where(eq(projectsTable.userId, userId))
+    .groupBy(projectsTable.id)
     .orderBy(desc(projectsTable.createdAt));
 
-  const projectsWithCounts = await Promise.all(
-    projects.map(async (p) => {
-      const [imageCount] = await db
-        .select({ count: count() })
-        .from(editedImagesTable)
-        .where(eq(editedImagesTable.projectId, p.id));
-      const [adCount] = await db
-        .select({ count: count() })
-        .from(adsTable)
-        .where(eq(adsTable.projectId, p.id));
-      return {
-        id: p.id,
-        userId: p.userId,
-        name: p.name,
-        description: p.description ?? null,
-        originalImageUrl: p.originalImageUrl,
-        imageCount: Number(imageCount?.count ?? 0),
-        adCount: Number(adCount?.count ?? 0),
-        createdAt: p.createdAt.toISOString(),
-      };
-    }),
+  res.json(
+    projectsWithCounts.map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      name: p.name,
+      description: p.description ?? null,
+      originalImageUrl: p.originalImageUrl,
+      imageCount: Number(p.imageCount ?? 0),
+      adCount: Number(p.adCount ?? 0),
+      createdAt: p.createdAt.toISOString(),
+    })),
   );
-
-  res.json(projectsWithCounts);
 });
 
 router.post("/projects", requireAuth, upload.single("image"), async (req, res): Promise<void> => {
@@ -102,57 +108,43 @@ router.post("/projects", requireAuth, upload.single("image"), async (req, res): 
 router.get("/projects/stats", requireAuth, async (req, res): Promise<void> => {
   const userId = req.session.userId!;
 
-  const userProjects = await db
-    .select()
+  // Same grouped-join technique as GET /projects, reused here so a
+  // dashboard load costs 2 queries total (totals + the 5 most recent, each
+  // already carrying their own counts) instead of the previous 1 + 4N.
+  const projectsWithCounts = await db
+    .select({
+      id: projectsTable.id,
+      userId: projectsTable.userId,
+      name: projectsTable.name,
+      description: projectsTable.description,
+      originalImageUrl: projectsTable.originalImageUrl,
+      createdAt: projectsTable.createdAt,
+      imageCount: sql<number>`count(distinct ${editedImagesTable.id})`,
+      adCount: sql<number>`count(distinct ${adsTable.id})`,
+    })
     .from(projectsTable)
+    .leftJoin(editedImagesTable, eq(editedImagesTable.projectId, projectsTable.id))
+    .leftJoin(adsTable, eq(adsTable.projectId, projectsTable.id))
     .where(eq(projectsTable.userId, userId))
+    .groupBy(projectsTable.id)
     .orderBy(desc(projectsTable.createdAt));
 
-  const projectIds = userProjects.map((p) => p.id);
+  const totalImages = projectsWithCounts.reduce((sum, p) => sum + Number(p.imageCount ?? 0), 0);
+  const totalAds = projectsWithCounts.reduce((sum, p) => sum + Number(p.adCount ?? 0), 0);
 
-  let totalImages = 0;
-  let totalAds = 0;
-
-  if (projectIds.length > 0) {
-    const imageCounts = await Promise.all(
-      projectIds.map((id) =>
-        db.select({ count: count() }).from(editedImagesTable).where(eq(editedImagesTable.projectId, id)),
-      ),
-    );
-    const adCounts = await Promise.all(
-      projectIds.map((id) =>
-        db.select({ count: count() }).from(adsTable).where(eq(adsTable.projectId, id)),
-      ),
-    );
-    totalImages = imageCounts.reduce((sum, r) => sum + Number(r[0]?.count ?? 0), 0);
-    totalAds = adCounts.reduce((sum, r) => sum + Number(r[0]?.count ?? 0), 0);
-  }
-
-  const recentProjects = await Promise.all(
-    userProjects.slice(0, 5).map(async (p) => {
-      const [imageCount] = await db
-        .select({ count: count() })
-        .from(editedImagesTable)
-        .where(eq(editedImagesTable.projectId, p.id));
-      const [adCount] = await db
-        .select({ count: count() })
-        .from(adsTable)
-        .where(eq(adsTable.projectId, p.id));
-      return {
-        id: p.id,
-        userId: p.userId,
-        name: p.name,
-        description: p.description ?? null,
-        originalImageUrl: p.originalImageUrl,
-        imageCount: Number(imageCount?.count ?? 0),
-        adCount: Number(adCount?.count ?? 0),
-        createdAt: p.createdAt.toISOString(),
-      };
-    }),
-  );
+  const recentProjects = projectsWithCounts.slice(0, 5).map((p) => ({
+    id: p.id,
+    userId: p.userId,
+    name: p.name,
+    description: p.description ?? null,
+    originalImageUrl: p.originalImageUrl,
+    imageCount: Number(p.imageCount ?? 0),
+    adCount: Number(p.adCount ?? 0),
+    createdAt: p.createdAt.toISOString(),
+  }));
 
   res.json({
-    totalProjects: userProjects.length,
+    totalProjects: projectsWithCounts.length,
     totalImages,
     totalAds,
     recentProjects,

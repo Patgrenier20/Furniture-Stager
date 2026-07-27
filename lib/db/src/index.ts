@@ -12,9 +12,28 @@ import * as schema from "./schema";
 const { Pool } = pg;
 
 /**
- * The SQL kept here is intentionally small and mirrors the Drizzle schema.
- * It gives a fresh local checkout a usable database without requiring Docker,
- * PostgreSQL, or a manual migration command before the API can start.
+ * Local-dev-only convenience bootstrap for the zero-config PGlite database.
+ *
+ * This intentionally mirrors the *current* schema (including the foreign
+ * keys and indexes defined in ./schema) so a fresh `pnpm dev` checkout gets
+ * a fully-formed database with no manual steps. It is NOT the source of
+ * truth for schema changes going forward, and it is never run against a
+ * real PostgreSQL database (see the DATABASE_URL branch below).
+ *
+ * Why not just call the real migrator here too? This module gets bundled
+ * by esbuild into a single dist/index.mjs file (see artifacts/api-server's
+ * build.mjs). Once bundled, `import.meta.url` resolves to that bundle's own
+ * location, not to this source file's location in lib/db/src -- so a
+ * migrationsFolder path computed relative to this file would silently
+ * point at the wrong directory at runtime. A plain SQL string has no such
+ * path dependency, which is why it's the right tool for this dev-only
+ * convenience path specifically.
+ *
+ * If you already have a local .local-data directory from before the
+ * foreign keys/indexes/billing_events table existed, IF NOT EXISTS means
+ * those additions won't retroactively apply to it. Local dev data is
+ * disposable -- delete .local-data (or set LOCAL_DATABASE_PATH elsewhere)
+ * to get a clean recreate with the current schema.
  */
 const bootstrapSql = `
   CREATE TABLE IF NOT EXISTS users (
@@ -40,7 +59,7 @@ const bootstrapSql = `
 
   CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
     original_image_url TEXT NOT NULL,
@@ -49,7 +68,7 @@ const bootstrapSql = `
 
   CREATE TABLE IF NOT EXISTS edited_images (
     id SERIAL PRIMARY KEY,
-    project_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     type TEXT NOT NULL,
     image_url TEXT NOT NULL,
     room_style TEXT,
@@ -58,7 +77,7 @@ const bootstrapSql = `
 
   CREATE TABLE IF NOT EXISTS ads (
     id SERIAL PRIMARY KEY,
-    project_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     price NUMERIC(10, 2),
@@ -68,6 +87,14 @@ const bootstrapSql = `
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 
+  CREATE TABLE IF NOT EXISTS billing_events (
+    id SERIAL PRIMARY KEY,
+    stripe_event_id TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS users_stripe_customer_id_idx ON users (stripe_customer_id);
   CREATE INDEX IF NOT EXISTS projects_user_id_idx ON projects (user_id);
   CREATE INDEX IF NOT EXISTS edited_images_project_id_idx ON edited_images (project_id);
   CREATE INDEX IF NOT EXISTS ads_project_id_idx ON ads (project_id);
@@ -81,8 +108,15 @@ export let pool: pg.Pool | null = null;
 let database: Database;
 
 if (process.env.DATABASE_URL) {
+  // Schema for a real PostgreSQL database is managed exclusively through
+  // versioned migrations in lib/db/drizzle/ (source of truth: lib/db/src/schema).
+  // Run `pnpm --filter @workspace/db run migrate` as an explicit deploy step
+  // BEFORE starting this server -- it must not run implicitly on every app
+  // boot, both to keep schema changes reviewable/auditable and to avoid
+  // multiple server replicas racing to apply the same migration concurrently
+  // on startup. If you see "relation ... does not exist" errors, that means
+  // migrations haven't been applied to this DATABASE_URL yet.
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  await pool.query(bootstrapSql);
   database = drizzlePostgres(pool, { schema });
 } else if (process.env.NODE_ENV === "production") {
   throw new Error("DATABASE_URL is required when NODE_ENV=production.");

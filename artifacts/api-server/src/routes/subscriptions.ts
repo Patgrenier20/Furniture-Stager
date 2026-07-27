@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, billingEventsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
@@ -107,6 +107,25 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
     const stripe = await getStripe();
     const sig = req.headers["stripe-signature"] as string;
     const event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+
+    // Stripe explicitly does not guarantee exactly-once delivery -- the same
+    // event can be redelivered (e.g. our server is slow to respond and
+    // Stripe retries). Recording each event.id here, guarded by a unique
+    // constraint, lets a redelivered event be recognized and skipped instead
+    // of re-applying its side effects. onConflictDoNothing makes the
+    // check-and-record atomic, so two near-simultaneous deliveries of the
+    // same event can't both slip past this check.
+    const [inserted] = await db
+      .insert(billingEventsTable)
+      .values({ stripeEventId: event.id, type: event.type })
+      .onConflictDoNothing()
+      .returning({ id: billingEventsTable.id });
+
+    if (!inserted) {
+      logger.info({ eventId: event.id, eventType: event.type }, "Skipping already-processed Stripe webhook event");
+      res.json({ received: true });
+      return;
+    }
 
     switch (event.type) {
       case "customer.subscription.created":

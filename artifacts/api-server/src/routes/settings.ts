@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { encryptSecret } from "../lib/crypto";
 
 const router: IRouter = Router();
 
@@ -51,6 +52,10 @@ router.put("/settings/ai", requireAuth, async (req, res): Promise<void> => {
     mistralApiKey,
   } = req.body ?? {};
 
+  // Provider API keys are encrypted at rest (AES-256-GCM) before they ever
+  // reach the database. See ../lib/crypto for the envelope format and the
+  // legacy-plaintext fallback on the read side (getImageClientForUser /
+  // getAdClientForUser).
   const [updated] = await db
     .update(usersTable)
     .set({
@@ -58,11 +63,11 @@ router.put("/settings/ai", requireAuth, async (req, res): Promise<void> => {
       ...(textModel !== undefined ? { textModel } : {}),
       ...(imageModel !== undefined ? { imageModel } : {}),
       ...(multimodalModel !== undefined ? { multimodalModel } : {}),
-      ...(openaiApiKey !== undefined ? { openaiApiKey: openaiApiKey || null } : {}),
-      ...(anthropicApiKey !== undefined ? { anthropicApiKey: anthropicApiKey || null } : {}),
-      ...(googleApiKey !== undefined ? { googleApiKey: googleApiKey || null } : {}),
-      ...(xaiApiKey !== undefined ? { xaiApiKey: xaiApiKey || null } : {}),
-      ...(mistralApiKey !== undefined ? { mistralApiKey: mistralApiKey || null } : {}),
+      ...(openaiApiKey !== undefined ? { openaiApiKey: encryptSecret(openaiApiKey) } : {}),
+      ...(anthropicApiKey !== undefined ? { anthropicApiKey: encryptSecret(anthropicApiKey) } : {}),
+      ...(googleApiKey !== undefined ? { googleApiKey: encryptSecret(googleApiKey) } : {}),
+      ...(xaiApiKey !== undefined ? { xaiApiKey: encryptSecret(xaiApiKey) } : {}),
+      ...(mistralApiKey !== undefined ? { mistralApiKey: encryptSecret(mistralApiKey) } : {}),
     })
     .where(eq(usersTable.id, userId))
     .returning();
