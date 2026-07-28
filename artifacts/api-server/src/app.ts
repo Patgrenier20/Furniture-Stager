@@ -10,6 +10,7 @@ import pinoHttp from "pino-http";
 import session from "express-session";
 import path from "path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { handleStripeWebhook } from "./routes/subscriptions";
 import { logger } from "./lib/logger";
@@ -138,11 +139,12 @@ app.use("/api", (req: Request, res: Response) => {
 // checkout, so this block is skipped entirely rather than trying (and
 // failing) to serve files that were never built.
 //
-// process.cwd() here follows the same convention already used for the
-// uploads/ directory above -- this server is always started from within
-// artifacts/api-server (see package.json's "start" script), so its sibling
-// package artifacts/furniture-flip is one level up.
-const frontendDistDir = path.join(process.cwd(), "..", "furniture-flip", "dist", "public");
+// Resolve from the compiled module location rather than the process cwd, which
+// can vary when the server is launched by a service manager or direct node
+// invocation. Allow deployments with a different artifact layout to override it.
+const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
+const frontendDistDir = process.env.FRONTEND_DIST_DIR
+  ?? path.resolve(runtimeDir, "..", "..", "furniture-flip", "dist", "public");
 const frontendIndexHtml = path.join(frontendDistDir, "index.html");
 
 if (fs.existsSync(frontendIndexHtml)) {
@@ -158,6 +160,13 @@ if (fs.existsSync(frontendIndexHtml)) {
   // wildcards are required now -- confirmed directly against this
   // project's installed express@5.2.1, not assumed from memory.
   app.get("/*splat", (req: Request, res: Response) => {
+    // Never turn a missing asset into a successful HTML response. This keeps
+    // broken or partial frontend deployments diagnosable in the browser.
+    if (path.extname(req.path)) {
+      res.status(404).end();
+      return;
+    }
+
     res.sendFile(frontendIndexHtml);
   });
 
