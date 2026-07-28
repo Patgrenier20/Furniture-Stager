@@ -1,29 +1,16 @@
 import { Router, type IRouter } from "express";
-import { db, projectsTable, editedImagesTable, adsTable, usersTable } from "@workspace/db";
+import { db, projectsTable, editedImagesTable, adsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { checkAndIncrementUsage, refundUsage } from "../lib/usage";
-import { createOpenAIClient } from "../lib/openai";
-import { decryptSecret } from "../lib/crypto";
+import {
+  resolveProviderForUser,
+  MissingProviderKeyError,
+  PROVIDER_LABELS,
+  stripJsonCodeFence,
+} from "../lib/ai-providers";
 
 const router: IRouter = Router();
-
-async function getAdClientForUser(userId: number) {
-  const [user] = await db
-    .select({
-      id: usersTable.id,
-      openaiApiKey: usersTable.openaiApiKey,
-    })
-    .from(usersTable)
-    .where(eq(usersTable.id, userId));
-
-  const apiKey = decryptSecret(user?.openaiApiKey) ?? process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("missing_openai_key");
-  }
-
-  return createOpenAIClient(apiKey);
-}
 
 router.get("/projects/:id/ads", requireAuth, async (req, res): Promise<void> => {
   const userId = req.session.userId!;
@@ -139,24 +126,17 @@ ${project.description ? `- Description from seller: ${project.description}` : ""
 Write an authentic, appealing listing that would attract serious buyers.`;
 
   try {
-    const openai = await getAdClientForUser(userId);
+    const { adapter, textModel } = await resolveProviderForUser(userId);
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_tokens: 600,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
+    const content = await adapter.generateText({
+      systemPrompt,
+      userPrompt,
+      model: textModel,
+      maxTokens: 600,
+      jsonResponse: true,
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error("No content returned from OpenAI");
-    }
-
-    const parsed = JSON.parse(content) as { title: string; description: string };
+    const parsed = JSON.parse(stripJsonCodeFence(content)) as { title: string; description: string };
 
     const [ad] = await db
       .insert(adsTable)
@@ -185,13 +165,13 @@ Write an authentic, appealing listing that would attract serious buyers.`;
   } catch (err) {
     // The trial credit was already spent by checkAndIncrementUsage above,
     // before any of this ran. No ad was produced, so refund it -- a
-    // missing key or a failed OpenAI call shouldn't cost the user one of
-    // their limited free generations.
+    // missing key or a failed call shouldn't cost the user one of their
+    // limited free generations.
     await refundUsage(userId);
 
-    if (err instanceof Error && err.message === "missing_openai_key") {
+    if (err instanceof MissingProviderKeyError) {
       res.status(400).json({
-        error: "Add your OpenAI API key in Account & AI before generating ads.",
+        error: `Add your ${PROVIDER_LABELS[err.provider]} API key in Account & AI before generating ads.`,
       });
       return;
     }

@@ -57,9 +57,11 @@ catalog:
 autoInstallPeers: false
 
 allowBuilds:
+  '@google/genai': false
   '@swc/core': true
   esbuild: true
   msw: true
+  protobufjs: false
   unrs-resolver: true
 
 overrides:

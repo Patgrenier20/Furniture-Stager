@@ -28,6 +28,18 @@ type AiSettings = {
 const providerOptions = ["openai", "anthropic", "google", "xai", "mistral"];
 const MASK = "••••••••";
 
+// Sensible current defaults per provider, so switching the provider dropdown
+// doesn't silently leave an incompatible model name (e.g. OpenAI's
+// "gpt-image-1") in place for a provider that doesn't recognize it. Users can
+// still freely overwrite these -- they're plain text fields, not a fixed list.
+const PROVIDER_MODEL_DEFAULTS: Record<string, { text: string; image: string; multimodal: string; imageSupported: boolean }> = {
+  openai: { text: "gpt-4.1", image: "gpt-image-1", multimodal: "gpt-4.1", imageSupported: true },
+  anthropic: { text: "claude-opus-4-7", image: "", multimodal: "claude-opus-4-7", imageSupported: false },
+  google: { text: "gemini-3.5-flash", image: "gemini-3.1-flash-image", multimodal: "gemini-3.5-flash", imageSupported: true },
+  xai: { text: "grok-4.3", image: "", multimodal: "grok-4.3", imageSupported: false },
+  mistral: { text: "mistral-large-latest", image: "", multimodal: "mistral-large-latest", imageSupported: false },
+};
+
 export default function AccountSettings() {
   const { data: user } = useGetMe();
   const { toast } = useToast();
@@ -73,6 +85,18 @@ export default function AccountSettings() {
     }),
     [user?.plan]
   );
+
+  const onProviderChange = (nextProvider: string) => {
+    setModelProvider(nextProvider);
+    const suggestion = PROVIDER_MODEL_DEFAULTS[nextProvider];
+    if (suggestion) {
+      setTextModel(suggestion.text);
+      setImageModel(suggestion.image);
+      setMultimodalModel(suggestion.multimodal);
+    }
+  };
+
+  const imageEditingSupported = PROVIDER_MODEL_DEFAULTS[modelProvider]?.imageSupported ?? true;
 
   const onSave = async () => {
     setLoading(true);
@@ -157,7 +181,7 @@ export default function AccountSettings() {
 
             <div className="space-y-2">
               <Label>Model provider</Label>
-              <Select value={modelProvider} onValueChange={setModelProvider}>
+              <Select value={modelProvider} onValueChange={onProviderChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -178,7 +202,18 @@ export default function AccountSettings() {
 
             <div className="space-y-2">
               <Label>Default image model</Label>
-              <Input value={imageModel} onChange={(e) => setImageModel(e.target.value)} placeholder={defaults.imageModel} />
+              <Input
+                value={imageModel}
+                onChange={(e) => setImageModel(e.target.value)}
+                placeholder={defaults.imageModel}
+                disabled={!imageEditingSupported}
+              />
+              {!imageEditingSupported && (
+                <p className="text-xs text-muted-foreground">
+                  {modelProvider} doesn't support image staging or background removal -- only OpenAI and Google do today.
+                  You can still use {modelProvider} for ad copy generation.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

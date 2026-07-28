@@ -1,10 +1,14 @@
 import { Router, type IRouter } from "express";
-import { db, projectsTable, editedImagesTable, usersTable } from "@workspace/db";
+import { db, projectsTable, editedImagesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { checkAndIncrementUsage, refundUsage } from "../lib/usage";
-import { createOpenAIClient } from "../lib/openai";
-import { decryptSecret } from "../lib/crypto";
+import {
+  resolveProviderForUser,
+  MissingProviderKeyError,
+  ProviderCapabilityError,
+  PROVIDER_LABELS,
+} from "../lib/ai-providers";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
@@ -39,23 +43,6 @@ async function saveBase64Image(base64Data: string, ext = ".png"): Promise<string
   return filename;
 }
 
-async function getImageClientForUser(userId: number) {
-  const [user] = await db
-    .select({
-      id: usersTable.id,
-      openaiApiKey: usersTable.openaiApiKey,
-    })
-    .from(usersTable)
-    .where(eq(usersTable.id, userId));
-
-  const apiKey = decryptSecret(user?.openaiApiKey) ?? process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("missing_openai_key");
-  }
-
-  return createOpenAIClient(apiKey);
-}
-
 router.post("/projects/:id/remove-background", requireAuth, async (req, res): Promise<void> => {
   const userId = req.session.userId!;
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -85,24 +72,19 @@ router.post("/projects/:id/remove-background", requireAuth, async (req, res): Pr
   req.log.info({ projectId }, "Removing background");
 
   try {
-    const openai = await getImageClientForUser(userId);
+    const { adapter, imageModel } = await resolveProviderForUser(userId, { requireImageEditing: true });
 
     // Download the original image
     const imageBuffer = await downloadImageToBuffer(project.originalImageUrl);
-    const imageFile = new File([new Uint8Array(imageBuffer)], "image.png", { type: "image/png" });
 
-    const result = await openai.images.edit({
-      model: "gpt-image-1",
-      image: imageFile,
+    const { base64: b64 } = await adapter.editImage({
+      image: imageBuffer,
+      mimeType: "image/png",
+      model: imageModel,
       prompt:
         "Remove the background from this furniture image. Make the background completely transparent. Keep only the furniture piece, preserving all detail and edges cleanly.",
       size: "1024x1024",
     });
-
-    const b64 = result.data?.[0]?.b64_json;
-    if (!b64) {
-      throw new Error("No image data returned from OpenAI");
-    }
 
     const filename = await saveBase64Image(b64, ".png");
     const imageUrl = getImageUrl(req, filename);
@@ -123,13 +105,19 @@ router.post("/projects/:id/remove-background", requireAuth, async (req, res): Pr
   } catch (err) {
     // The trial credit was already spent by checkAndIncrementUsage above,
     // before any of this ran. No image was produced, so refund it -- a
-    // missing key or a failed OpenAI call shouldn't cost the user one of
-    // their limited free generations.
+    // missing key, an unsupported provider, or a failed call shouldn't
+    // cost the user one of their limited free generations.
     await refundUsage(userId);
 
-    if (err instanceof Error && err.message === "missing_openai_key") {
+    if (err instanceof MissingProviderKeyError) {
       res.status(400).json({
-        error: "Add your OpenAI API key in Account & AI before using image editing.",
+        error: `Add your ${PROVIDER_LABELS[err.provider]} API key in Account & AI before using image editing.`,
+      });
+      return;
+    }
+    if (err instanceof ProviderCapabilityError) {
+      res.status(400).json({
+        error: `${PROVIDER_LABELS[err.provider]} doesn't support image editing yet. Switch to OpenAI or Google in Account & AI settings, or use ${PROVIDER_LABELS[err.provider]} for ad copy only.`,
       });
       return;
     }
@@ -174,7 +162,7 @@ router.post("/projects/:id/stage", requireAuth, async (req, res): Promise<void> 
   req.log.info({ projectId, roomStyle }, "Staging room");
 
   try {
-    const openai = await getImageClientForUser(userId);
+    const { adapter, imageModel } = await resolveProviderForUser(userId, { requireImageEditing: true });
 
     // Use source edited image if provided, else use original
     let sourceImageUrl = project.originalImageUrl;
@@ -187,7 +175,6 @@ router.post("/projects/:id/stage", requireAuth, async (req, res): Promise<void> 
     }
 
     const imageBuffer = await downloadImageToBuffer(sourceImageUrl);
-    const imageFile = new File([new Uint8Array(imageBuffer)], "furniture.png", { type: "image/png" });
 
     const styleDescriptions: Record<string, string> = {
       modern: "a modern, contemporary room with clean lines, neutral colors, and minimalist decor",
@@ -205,17 +192,13 @@ router.post("/projects/:id/stage", requireAuth, async (req, res): Promise<void> 
 
     const prompt = `Place this furniture piece in ${styleDesc}. The furniture should be naturally staged as if it belongs in the room. Professional interior photography style, well-lit, realistic.${extraPrompt}`;
 
-    const result = await openai.images.edit({
-      model: "gpt-image-1",
-      image: imageFile,
+    const { base64: b64 } = await adapter.editImage({
+      image: imageBuffer,
+      mimeType: "image/png",
+      model: imageModel,
       prompt,
       size: "1536x1024",
     });
-
-    const b64 = result.data?.[0]?.b64_json;
-    if (!b64) {
-      throw new Error("No image data returned from OpenAI");
-    }
 
     const filename = await saveBase64Image(b64, ".png");
     const imageUrl = getImageUrl(req, filename);
@@ -238,9 +221,15 @@ router.post("/projects/:id/stage", requireAuth, async (req, res): Promise<void> 
     // already spent before this ran, and no image was produced.
     await refundUsage(userId);
 
-    if (err instanceof Error && err.message === "missing_openai_key") {
+    if (err instanceof MissingProviderKeyError) {
       res.status(400).json({
-        error: "Add your OpenAI API key in Account & AI before using image editing.",
+        error: `Add your ${PROVIDER_LABELS[err.provider]} API key in Account & AI before using image editing.`,
+      });
+      return;
+    }
+    if (err instanceof ProviderCapabilityError) {
+      res.status(400).json({
+        error: `${PROVIDER_LABELS[err.provider]} doesn't support image editing yet. Switch to OpenAI or Google in Account & AI settings, or use ${PROVIDER_LABELS[err.provider]} for ad copy only.`,
       });
       return;
     }
