@@ -9,6 +9,7 @@ import helmet from "helmet";
 import pinoHttp from "pino-http";
 import session from "express-session";
 import path from "path";
+import fs from "node:fs";
 import router from "./routes";
 import { handleStripeWebhook } from "./routes/subscriptions";
 import { logger } from "./lib/logger";
@@ -109,6 +110,64 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Any /api/* request that reaches this point matched no route above. Return
+// a machine-readable 404 here explicitly, before the frontend-serving
+// middleware below -- otherwise an unmatched API path would silently fall
+// through to the SPA catch-all and come back as a 200 with index.html's
+// HTML, which looks like success and makes a typo'd or removed endpoint
+// very confusing to debug.
+app.use("/api", (req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+// The frontend (artifacts/furniture-flip) is a separate Vite/React app with
+// no build-time knowledge of where the API lives -- its compiled bundle
+// calls bare relative paths like "/api/projects", which only works if the
+// browser sees the frontend and the API as the same origin. Rather than
+// requiring every hosting platform to be configured with a reverse-proxy
+// rewrite rule to make that true, this server serves the frontend's own
+// production build directly, so a single deployed process is correct on
+// any host with no routing configuration at all.
+//
+// This only activates once the frontend has actually been built (i.e. in
+// a production deploy, or after manually running the frontend's build
+// script). Local dev is unaffected: `pnpm dev` runs the frontend on its own
+// Vite dev server with its own hot-reloading, which is what you want during
+// development, and this server's dist/public won't exist yet in a fresh
+// checkout, so this block is skipped entirely rather than trying (and
+// failing) to serve files that were never built.
+//
+// process.cwd() here follows the same convention already used for the
+// uploads/ directory above -- this server is always started from within
+// artifacts/api-server (see package.json's "start" script), so its sibling
+// package artifacts/furniture-flip is one level up.
+const frontendDistDir = path.join(process.cwd(), "..", "furniture-flip", "dist", "public");
+const frontendIndexHtml = path.join(frontendDistDir, "index.html");
+
+if (fs.existsSync(frontendIndexHtml)) {
+  app.use(express.static(frontendDistDir));
+
+  // SPA fallback: any remaining GET request that isn't a static asset and
+  // isn't /api/* (already handled above) is a client-side route like
+  // /dashboard or /projects/3 -- serve the SPA shell and let the frontend's
+  // own router (wouter) take it from there. This must be registered last.
+  //
+  // Express 5 changed wildcard route syntax (path-to-regexp v6+): the bare
+  // "*" from Express 4 throws "Missing parameter name" here. Named
+  // wildcards are required now -- confirmed directly against this
+  // project's installed express@5.2.1, not assumed from memory.
+  app.get("/*splat", (req: Request, res: Response) => {
+    res.sendFile(frontendIndexHtml);
+  });
+
+  logger.info({ frontendDistDir }, "Serving frontend build from the API server");
+} else {
+  logger.info(
+    { frontendIndexHtml },
+    "Frontend build not found -- skipping static/SPA serving (expected in local dev)",
+  );
+}
 
 // Keep API failures machine-readable. Express's default handler returns an
 // HTML stack trace in development, which made the frontend surface only an
