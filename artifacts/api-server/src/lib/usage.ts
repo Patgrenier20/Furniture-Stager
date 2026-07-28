@@ -52,3 +52,26 @@ export async function checkAndIncrementUsage(userId: number): Promise<{ allowed:
     message: `Free trial limit of ${user.trialLimit} uses reached. Upgrade to Pro for unlimited access.`,
   };
 }
+
+/**
+ * Refunds one unit of trial usage after a call that was already charged via
+ * checkAndIncrementUsage subsequently failed to produce a result (the AI
+ * provider call errored, timed out, returned no usable output, or the user
+ * had no API key configured at all). Without this, any failure -- a
+ * transient provider outage, a rate limit, a missing key -- permanently
+ * costs a free-trial user one of their limited generations for zero
+ * output. Observed live: two failed calls in a row consumed 2 of 3 total
+ * trial credits before a single generation ever succeeded.
+ *
+ * Pro users are never charged by checkAndIncrementUsage in the first place,
+ * so there's nothing to refund for them. greatest(trial_used - 1, 0) makes
+ * this safe to call unconditionally -- without checking the user's plan or
+ * worrying about being called twice for the same request -- since it can
+ * never push trial_used below zero.
+ */
+export async function refundUsage(userId: number): Promise<void> {
+  await db
+    .update(usersTable)
+    .set({ trialUsed: sql`greatest(${usersTable.trialUsed} - 1, 0)` })
+    .where(eq(usersTable.id, userId));
+}

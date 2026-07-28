@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, projectsTable, editedImagesTable, usersTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { checkAndIncrementUsage } from "../lib/usage";
+import { checkAndIncrementUsage, refundUsage } from "../lib/usage";
 import { createOpenAIClient } from "../lib/openai";
 import { decryptSecret } from "../lib/crypto";
 import { readFile, writeFile } from "node:fs/promises";
@@ -121,6 +121,12 @@ router.post("/projects/:id/remove-background", requireAuth, async (req, res): Pr
       createdAt: editedImage.createdAt.toISOString(),
     });
   } catch (err) {
+    // The trial credit was already spent by checkAndIncrementUsage above,
+    // before any of this ran. No image was produced, so refund it -- a
+    // missing key or a failed OpenAI call shouldn't cost the user one of
+    // their limited free generations.
+    await refundUsage(userId);
+
     if (err instanceof Error && err.message === "missing_openai_key") {
       res.status(400).json({
         error: "Add your OpenAI API key in Account & AI before using image editing.",
@@ -228,6 +234,10 @@ router.post("/projects/:id/stage", requireAuth, async (req, res): Promise<void> 
       createdAt: editedImage.createdAt.toISOString(),
     });
   } catch (err) {
+    // Same reasoning as remove-background above: the trial credit was
+    // already spent before this ran, and no image was produced.
+    await refundUsage(userId);
+
     if (err instanceof Error && err.message === "missing_openai_key") {
       res.status(400).json({
         error: "Add your OpenAI API key in Account & AI before using image editing.",
