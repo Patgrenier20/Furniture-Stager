@@ -21,6 +21,19 @@ function getImageUrl(_req: unknown, filename: string): string {
   return `/api/uploads/${filename}`;
 }
 
+function getImageMimeType(imageUrl: string): string {
+  switch (path.extname(imageUrl).toLowerCase()) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".png":
+    default:
+      return "image/png";
+  }
+}
+
 async function downloadImageToBuffer(imageUrl: string): Promise<Buffer> {
   const uploadsPrefix = "/api/uploads/";
   if (!imageUrl.startsWith(uploadsPrefix)) {
@@ -79,7 +92,7 @@ router.post("/projects/:id/remove-background", requireAuth, async (req, res): Pr
 
     const { base64: b64 } = await adapter.editImage({
       image: imageBuffer,
-      mimeType: "image/png",
+      mimeType: getImageMimeType(project.originalImageUrl),
       model: imageModel,
       prompt:
         "Remove the background from this furniture image. Make the background completely transparent. Keep only the furniture piece, preserving all detail and edges cleanly.",
@@ -175,6 +188,7 @@ router.post("/projects/:id/stage", requireAuth, async (req, res): Promise<void> 
     }
 
     const imageBuffer = await downloadImageToBuffer(sourceImageUrl);
+    const imageMimeType = getImageMimeType(sourceImageUrl);
 
     const styleDescriptions: Record<string, string> = {
       modern: "a modern, contemporary room with clean lines, neutral colors, and minimalist decor",
@@ -194,7 +208,7 @@ router.post("/projects/:id/stage", requireAuth, async (req, res): Promise<void> 
 
     const { base64: b64 } = await adapter.editImage({
       image: imageBuffer,
-      mimeType: "image/png",
+      mimeType: imageMimeType,
       model: imageModel,
       prompt,
       size: "1536x1024",
