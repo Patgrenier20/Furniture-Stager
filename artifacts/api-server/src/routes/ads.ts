@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, projectsTable, editedImagesTable, adsTable, usersTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { checkAndIncrementUsage } from "../lib/usage";
+import { checkAndIncrementUsage, refundUsage } from "../lib/usage";
 import { createOpenAIClient } from "../lib/openai";
 import { decryptSecret } from "../lib/crypto";
 
@@ -183,6 +183,12 @@ Write an authentic, appealing listing that would attract serious buyers.`;
       createdAt: ad.createdAt.toISOString(),
     });
   } catch (err) {
+    // The trial credit was already spent by checkAndIncrementUsage above,
+    // before any of this ran. No ad was produced, so refund it -- a
+    // missing key or a failed OpenAI call shouldn't cost the user one of
+    // their limited free generations.
+    await refundUsage(userId);
+
     if (err instanceof Error && err.message === "missing_openai_key") {
       res.status(400).json({
         error: "Add your OpenAI API key in Account & AI before generating ads.",
