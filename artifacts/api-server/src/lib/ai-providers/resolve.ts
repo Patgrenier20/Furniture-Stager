@@ -103,6 +103,6 @@ export async function resolveProviderForUser(
   return {
     adapter: ADAPTER_FACTORY[provider](apiKey),
     textModel: user?.textModel || "gpt-4.1",
-    imageModel: user?.imageModel || "gpt-image-1",
+    imageModel: user?.imageModel || "gpt-image-2",
   };
 }

@@ -24,6 +24,8 @@ import type {
   AdInput,
   AuthInput,
   CheckoutSession,
+  DeleteAccount200,
+  DeleteAccountInput,
   EditedImage,
   ErrorResponse,
   HealthStatus,
@@ -32,6 +34,7 @@ import type {
   ProjectInput,
   ProjectStats,
   StageInput,
+  TransformationInput,
   UsageInfo,
   User
 } from './api.schemas';
@@ -352,6 +355,77 @@ export const useLogout = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getLogoutMutationOptions(options));
+    }
+
+export const getDeleteAccountUrl = () => {
+
+
+
+
+  return `/api/auth/account`
+}
+
+/**
+ * @summary Permanently delete the authenticated account and owned data
+ */
+export const deleteAccount = async (deleteAccountInput: DeleteAccountInput, options?: RequestInit): Promise<DeleteAccount200> => {
+
+  return customFetch<DeleteAccount200>(getDeleteAccountUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(deleteAccountInput)
+  }
+);}
+
+
+
+
+
+export const getDeleteAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAccount>>, TError,{data: BodyType<DeleteAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAccount>>, TError,{data: BodyType<DeleteAccountInput>}, TContext> => {
+
+const mutationKey = ['deleteAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAccount>>, {data: BodyType<DeleteAccountInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  deleteAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAccountMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAccount>>>
+    export type DeleteAccountMutationBody = BodyType<DeleteAccountInput>
+    export type DeleteAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Permanently delete the authenticated account and owned data
+ */
+export const useDeleteAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAccount>>, TError,{data: BodyType<DeleteAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAccount>>,
+        TError,
+        {data: BodyType<DeleteAccountInput>},
+        TContext
+      > => {
+      return useMutation(getDeleteAccountMutationOptions(options));
     }
 
 export const getGetMeUrl = () => {
@@ -1028,6 +1102,78 @@ export function useListProjectImages<TData = Awaited<ReturnType<typeof listProje
 
 
 
+
+export const getGenerateTransformationsUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/transformations`
+}
+
+/**
+ * @summary Generate three furniture transformation concepts
+ */
+export const generateTransformations = async (id: number,
+    transformationInput?: TransformationInput, options?: RequestInit): Promise<EditedImage[]> => {
+
+  return customFetch<EditedImage[]>(getGenerateTransformationsUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(transformationInput)
+  }
+);}
+
+
+
+
+
+export const getGenerateTransformationsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateTransformations>>, TError,{id: number;data?: BodyType<TransformationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateTransformations>>, TError,{id: number;data?: BodyType<TransformationInput>}, TContext> => {
+
+const mutationKey = ['generateTransformations'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateTransformations>>, {id: number;data?: BodyType<TransformationInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  generateTransformations(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateTransformationsMutationResult = NonNullable<Awaited<ReturnType<typeof generateTransformations>>>
+    export type GenerateTransformationsMutationBody = BodyType<TransformationInput> | undefined
+    export type GenerateTransformationsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Generate three furniture transformation concepts
+ */
+export const useGenerateTransformations = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateTransformations>>, TError,{id: number;data?: BodyType<TransformationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateTransformations>>,
+        TError,
+        {id: number;data?: BodyType<TransformationInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateTransformationsMutationOptions(options));
+    }
 
 export const getListProjectAdsUrl = (id: number,) => {
 

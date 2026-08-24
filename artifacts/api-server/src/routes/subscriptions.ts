@@ -3,6 +3,7 @@ import { db, usersTable, billingEventsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
+import { hasLifetimeProEntitlement } from "../lib/entitlements";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,11 @@ router.post("/subscriptions/checkout", requireAuth, async (req, res): Promise<vo
 
     if (!user) {
       res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    if (hasLifetimeProEntitlement(user.email)) {
+      res.status(409).json({ error: "This account already has lifetime Pro access" });
       return;
     }
 
@@ -143,10 +149,20 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
       case "customer.subscription.deleted": {
         const subscription = event.data.object as { customer: string };
         const customerId = subscription.customer;
-        await db
-          .update(usersTable)
-          .set({ plan: "free", stripeSubscriptionId: null })
+        const affectedUsers = await db
+          .select()
+          .from(usersTable)
           .where(eq(usersTable.stripeCustomerId, customerId as string));
+
+        for (const user of affectedUsers) {
+          await db
+            .update(usersTable)
+            .set({
+              plan: hasLifetimeProEntitlement(user.email) ? "pro" : "free",
+              stripeSubscriptionId: null,
+            })
+            .where(eq(usersTable.id, user.id));
+        }
         break;
       }
       case "checkout.session.completed": {

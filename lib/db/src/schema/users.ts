@@ -11,7 +11,7 @@ export const usersTable = pgTable("users", {
   trialLimit: integer("trial_limit").notNull().default(3),
   modelProvider: text("model_provider").notNull().default("openai"),
   textModel: text("text_model").notNull().default("gpt-4.1"),
-  imageModel: text("image_model").notNull().default("gpt-image-1"),
+  imageModel: text("image_model").notNull().default("gpt-image-2"),
   multimodalModel: text("multimodal_model").notNull().default("gpt-4.1"),
   // Encrypted at rest (AES-256-GCM) by artifacts/api-server/src/lib/crypto.ts
   // before being written here — see routes/settings.ts. Never store or log

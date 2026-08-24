@@ -70,6 +70,21 @@ export const LogoutResponse = zod.unknown()
 
 
 /**
+ * @summary Permanently delete the authenticated account and owned data
+ */
+
+
+
+export const DeleteAccountBody = zod.object({
+  "password": zod.string().min(1)
+})
+
+export const DeleteAccountResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Get current user
  */
 export const GetMeResponse = zod.object({
@@ -158,7 +173,7 @@ export const GetProjectResponse = zod.object({
   "images": zod.array(zod.object({
   "id": zod.number(),
   "projectId": zod.number(),
-  "type": zod.enum(['background_removed', 'staged']),
+  "type": zod.enum(['background_removed', 'staged', 'transformation']),
   "imageUrl": zod.string(),
   "roomStyle": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -198,7 +213,7 @@ export const RemoveBackgroundParams = zod.object({
 export const RemoveBackgroundResponse = zod.object({
   "id": zod.number(),
   "projectId": zod.number(),
-  "type": zod.enum(['background_removed', 'staged']),
+  "type": zod.enum(['background_removed', 'staged', 'transformation']),
   "imageUrl": zod.string(),
   "roomStyle": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -215,13 +230,13 @@ export const StageRoomParams = zod.object({
 export const StageRoomBody = zod.object({
   "roomStyle": zod.enum(['modern', 'rustic', 'bohemian', 'minimalist', 'industrial', 'traditional', 'coastal', 'mid_century']),
   "additionalPrompt": zod.string().nullish(),
-  "sourceImageId": zod.number().nullish().describe('ID of an edited image to use as source (e.g. background-removed). Uses original if null.')
+  "sourceImageId": zod.number().describe('ID of a generated transformation selected for room staging.')
 })
 
 export const StageRoomResponse = zod.object({
   "id": zod.number(),
   "projectId": zod.number(),
-  "type": zod.enum(['background_removed', 'staged']),
+  "type": zod.enum(['background_removed', 'staged', 'transformation']),
   "imageUrl": zod.string(),
   "roomStyle": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -238,12 +253,36 @@ export const ListProjectImagesParams = zod.object({
 export const ListProjectImagesResponseItem = zod.object({
   "id": zod.number(),
   "projectId": zod.number(),
-  "type": zod.enum(['background_removed', 'staged']),
+  "type": zod.enum(['background_removed', 'staged', 'transformation']),
   "imageUrl": zod.string(),
   "roomStyle": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
 export const ListProjectImagesResponse = zod.array(ListProjectImagesResponseItem)
+
+
+/**
+ * @summary Generate three furniture transformation concepts
+ */
+export const GenerateTransformationsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const generateTransformationsBodyIncludeModernBaseDefault = false;
+
+export const GenerateTransformationsBody = zod.object({
+  "includeModernBase": zod.boolean().default(generateTransformationsBodyIncludeModernBaseDefault).describe('Allow one of the three concepts to replace only the existing bottom base or legs with a buildable modern base.')
+})
+
+export const GenerateTransformationsResponseItem = zod.object({
+  "id": zod.number(),
+  "projectId": zod.number(),
+  "type": zod.enum(['background_removed', 'staged', 'transformation']),
+  "imageUrl": zod.string(),
+  "roomStyle": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const GenerateTransformationsResponse = zod.array(GenerateTransformationsResponseItem).min(3).max(3)
 
 
 /**
@@ -279,7 +318,7 @@ export const GenerateAdBody = zod.object({
   "condition": zod.enum(['like_new', 'good', 'fair', 'poor']).optional(),
   "location": zod.string().nullish(),
   "additionalContext": zod.string().nullish(),
-  "imageId": zod.number().nullish().describe('ID of edited image to feature in the ad. Uses original if null.')
+  "imageId": zod.number().describe('ID of the staged image to feature in the marketplace ad.')
 })
 
 export const GenerateAdResponse = zod.object({

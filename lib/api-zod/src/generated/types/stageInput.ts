@@ -11,9 +11,6 @@ export interface StageInput {
   roomStyle: StageInputRoomStyle;
   /** @nullable */
   additionalPrompt?: string | null;
-  /**
-     * ID of an edited image to use as source (e.g. background-removed). Uses original if null.
-     * @nullable
-     */
-  sourceImageId?: number | null;
+  /** ID of a generated transformation selected for room staging. */
+  sourceImageId: number;
 }

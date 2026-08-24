@@ -10,14 +10,13 @@
     "preinstall": "node scripts/preinstall.mjs",
     "dev": "pnpm --filter @workspace/furniture-flip run dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "test": "pnpm --filter @workspace/api-server run test:auth",
+    "test": "pnpm --filter @workspace/api-server run test",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --if-present run typecheck"
   },
   "private": true,
   "dependencies": {},
   "devDependencies": {
-    "prettier": "^3.9.5",
     "typescript": "~5.9.3"
   }
 }

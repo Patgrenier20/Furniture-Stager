@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
-import { encryptSecret } from "../lib/crypto";
+import { encryptSecret, isSecretEncryptionConfigured } from "../lib/crypto";
 
 const router: IRouter = Router();
 
@@ -51,6 +51,24 @@ router.put("/settings/ai", requireAuth, async (req, res): Promise<void> => {
     xaiApiKey,
     mistralApiKey,
   } = req.body ?? {};
+
+  const suppliedKeys = [
+    openaiApiKey,
+    anthropicApiKey,
+    googleApiKey,
+    xaiApiKey,
+    mistralApiKey,
+  ];
+
+  if (
+    suppliedKeys.some((value) => typeof value === "string" && value.length > 0)
+    && !isSecretEncryptionConfigured()
+  ) {
+    res.status(503).json({
+      error: "Secure API-key storage is not configured on this server",
+    });
+    return;
+  }
 
   // Provider API keys are encrypted at rest (AES-256-GCM) before they ever
   // reach the database. See ../lib/crypto for the envelope format and the

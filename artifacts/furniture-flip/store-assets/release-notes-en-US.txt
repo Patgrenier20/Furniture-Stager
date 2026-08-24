@@ -1,0 +1,6 @@
+Initial FurniFlip release.
+
+- Turn furniture photos into clean, staged listing images.
+- Explore a guided refinish-to-list workflow.
+- Generate marketplace-ready listing copy.
+- Manage projects and account data from one workspace.

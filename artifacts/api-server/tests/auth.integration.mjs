@@ -44,6 +44,8 @@ async function startServer(port) {
     env: {
       ...process.env,
       DATABASE_URL: "",
+      ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+      LIFETIME_PRO_EMAILS: "auth.smoke@example.com",
       LOCAL_DATABASE_PATH: databasePath,
       LOG_LEVEL: "fatal",
       NODE_ENV: "test",
@@ -117,6 +119,7 @@ async function main() {
     });
     assert.equal(result.response.status, 201);
     assert.equal(result.body.email, "auth.smoke@example.com");
+    assert.equal(result.body.plan, "pro");
     const setCookie = result.response.headers.get("set-cookie") ?? "";
     assert.match(setCookie, /furniflip\.sid=/);
     assert.match(setCookie, /HttpOnly/i);
@@ -126,6 +129,21 @@ async function main() {
     result = await request(baseUrl, "/api/auth/me", { headers: { cookie } });
     assert.equal(result.response.status, 200);
     assert.equal(result.body.email, "auth.smoke@example.com");
+    assert.equal(result.body.plan, "pro");
+
+    result = await request(baseUrl, "/api/settings/ai", {
+      method: "PUT",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({
+        modelProvider: "openai",
+        textModel: "gpt-4.1",
+        imageModel: "gpt-image-2",
+        multimodalModel: "gpt-4.1",
+        openaiApiKey: "integration-test-key-not-real",
+      }),
+    });
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.openaiApiKey, "configured");
 
     result = await request(baseUrl, "/api/auth/register", {
       method: "POST",
@@ -174,8 +192,31 @@ async function main() {
       body: JSON.stringify({ email: "auth.smoke@example.com", password: "correct-horse-42" }),
     });
     assert.equal(result.response.status, 200);
+    const restartCookie = (result.response.headers.get("set-cookie") ?? "").split(";", 1)[0];
 
-    console.log("PASS auth integration: JSON errors, register, session, duplicate, logout, login, restart persistence");
+    result = await request(baseUrl, "/api/auth/account", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie: restartCookie },
+      body: JSON.stringify({ password: "wrong-password" }),
+    });
+    assert.equal(result.response.status, 401);
+
+    result = await request(baseUrl, "/api/auth/account", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie: restartCookie },
+      body: JSON.stringify({ password: "correct-horse-42" }),
+    });
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.ok, true);
+
+    result = await request(baseUrl, "/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "auth.smoke@example.com", password: "correct-horse-42" }),
+    });
+    assert.equal(result.response.status, 401);
+
+    console.log("PASS auth integration: JSON errors, register, session, duplicate, logout, login, restart persistence, deletion");
   } catch (error) {
     if (child?.testOutput) console.error(child.testOutput());
     throw error;

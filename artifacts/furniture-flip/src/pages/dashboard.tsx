@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FolderKanban, Images, PenLine, Plus, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { isAndroidPlayApp } from "@/lib/platform";
 
 export default function Dashboard() {
+  const isAndroid = isAndroidPlayApp();
   const { data: stats, isLoading: statsLoading } = useGetProjectStats();
   const { data: user } = useGetMe();
 
@@ -32,12 +34,18 @@ export default function Dashboard() {
             <AlertCircle className="w-6 h-6 text-destructive shrink-0 mt-0.5" />
             <div>
               <h3 className="font-bold text-destructive">Free trial limit reached</h3>
-              <p className="text-sm text-destructive/80 mt-1 mb-3">You've used all {user.trialLimit} free edits. Upgrade to Pro to continue creating stunning listings.</p>
-              <Link href="/pricing">
-                <Button size="sm" variant="outline" className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                  Upgrade to Pro
-                </Button>
-              </Link>
+              <p className="text-sm text-destructive/80 mt-1 mb-3">
+                {isAndroid
+                  ? `You've used all ${user.trialLimit} free edits available in the Android app.`
+                  : `You've used all ${user.trialLimit} free edits. Upgrade to Pro to continue creating stunning listings.`}
+              </p>
+              {!isAndroid ? (
+                <Link href="/pricing">
+                  <Button size="sm" variant="outline" className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
+                    Upgrade to Pro
+                  </Button>
+                </Link>
+              ) : null}
             </div>
           </div>
         )}

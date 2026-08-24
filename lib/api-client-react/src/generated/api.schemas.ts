@@ -38,6 +38,11 @@ export interface AuthInput {
   password: string;
 }
 
+export interface DeleteAccountInput {
+  /** @minLength 1 */
+  password: string;
+}
+
 export interface Project {
   id: number;
   userId: number;
@@ -56,6 +61,7 @@ export type EditedImageType = typeof EditedImageType[keyof typeof EditedImageTyp
 export const EditedImageType = {
   background_removed: 'background_removed',
   staged: 'staged',
+  transformation: 'transformation',
 } as const;
 
 export interface EditedImage {
@@ -127,11 +133,13 @@ export interface StageInput {
   roomStyle: StageInputRoomStyle;
   /** @nullable */
   additionalPrompt?: string | null;
-  /**
-     * ID of an edited image to use as source (e.g. background-removed). Uses original if null.
-     * @nullable
-     */
-  sourceImageId?: number | null;
+  /** ID of a generated transformation selected for room staging. */
+  sourceImageId: number;
+}
+
+export interface TransformationInput {
+  /** Allow one of the three concepts to replace only the existing bottom base or legs with a buildable modern base. */
+  includeModernBase?: boolean;
 }
 
 export type AdInputCondition = typeof AdInputCondition[keyof typeof AdInputCondition];
@@ -152,11 +160,8 @@ export interface AdInput {
   location?: string | null;
   /** @nullable */
   additionalContext?: string | null;
-  /**
-     * ID of edited image to feature in the ad. Uses original if null.
-     * @nullable
-     */
-  imageId?: number | null;
+  /** ID of the staged image to feature in the marketplace ad. */
+  imageId: number;
 }
 
 export type UsageInfoPlan = typeof UsageInfoPlan[keyof typeof UsageInfoPlan];
@@ -178,4 +183,8 @@ export interface UsageInfo {
 export interface CheckoutSession {
   url: string;
 }
+
+export type DeleteAccount200 = {
+  ok: boolean;
+};
 

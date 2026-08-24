@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -16,25 +17,34 @@ const formSchema = z.object({
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const requestedReturnTo = new URLSearchParams(window.location.search).get("returnTo");
+  const returnTo = requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//")
+    ? requestedReturnTo
+    : "/dashboard";
   const { data: user, isLoading: isAuthLoading } = useGetMe();
   const login = useLogin();
   const { toast } = useToast();
 
-  if (!isAuthLoading && user) {
-    setLocation("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (!isAuthLoading && user) {
+      setLocation(returnTo);
+    }
+  }, [isAuthLoading, user, returnTo, setLocation]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: "", password: "" },
   });
 
+  if (!isAuthLoading && user) {
+    return null;
+  }
+
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     login.mutate({ data: values }, {
       onSuccess: () => {
         toast({ title: "Welcome back", description: "Successfully logged in." });
-        setLocation("/dashboard");
+        setLocation(returnTo);
       },
       onError: (error) => {
         toast({ 

@@ -45,7 +45,7 @@ const bootstrapSql = `
     trial_limit INTEGER NOT NULL DEFAULT 3,
     model_provider TEXT NOT NULL DEFAULT 'openai',
     text_model TEXT NOT NULL DEFAULT 'gpt-4.1',
-    image_model TEXT NOT NULL DEFAULT 'gpt-image-1',
+    image_model TEXT NOT NULL DEFAULT 'gpt-image-2',
     multimodal_model TEXT NOT NULL DEFAULT 'gpt-4.1',
     openai_api_key TEXT,
     anthropic_api_key TEXT,
@@ -98,6 +98,13 @@ const bootstrapSql = `
   CREATE INDEX IF NOT EXISTS projects_user_id_idx ON projects (user_id);
   CREATE INDEX IF NOT EXISTS edited_images_project_id_idx ON edited_images (project_id);
   CREATE INDEX IF NOT EXISTS ads_project_id_idx ON ads (project_id);
+
+  -- Local-dev data can predate the high-fidelity image workflow. Upgrade only
+  -- the old OpenAI default; custom model choices remain untouched.
+  ALTER TABLE users ALTER COLUMN image_model SET DEFAULT 'gpt-image-2';
+  UPDATE users
+  SET image_model = 'gpt-image-2'
+  WHERE model_provider = 'openai' AND image_model = 'gpt-image-1';
 `;
 
 type Database = NodePgDatabase<typeof schema>;

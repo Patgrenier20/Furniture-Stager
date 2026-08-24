@@ -5,6 +5,17 @@ const IV_LENGTH = 12; // 96-bit IV, the recommended size for AES-GCM
 
 let cachedKey: Buffer | null = null;
 
+export function isSecretEncryptionConfigured(): boolean {
+  const raw = process.env.ENCRYPTION_KEY;
+  if (!raw) return false;
+
+  try {
+    return Buffer.from(raw, "base64").length === 32;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Resolves the 256-bit encryption key from ENCRYPTION_KEY (base64-encoded).
  * Cached after the first successful parse so we're not re-decoding the env
