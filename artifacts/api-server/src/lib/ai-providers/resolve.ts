@@ -31,6 +31,20 @@ const ADAPTER_FACTORY: Record<ProviderName, (apiKey: string) => AiProviderAdapte
   mistral: createMistralAdapter,
 };
 
+const PROVIDER_MODEL_DEFAULTS: Record<ProviderName, { text: string; image: string }> = {
+  openai: { text: "gpt-4.1", image: "gpt-image-2" },
+  anthropic: { text: "claude-opus-4-7", image: "" },
+  google: { text: "gemini-3.5-flash", image: "gemini-3.1-flash-image" },
+  xai: { text: "grok-4.3", image: "" },
+  mistral: { text: "mistral-large-latest", image: "" },
+};
+
+// Accounts created before switching providers retain the schema's OpenAI
+// defaults. Treat those values as unset for another provider instead of
+// sending an OpenAI model name to Anthropic, Google, xAI, or Mistral.
+const OPENAI_TEXT_DEFAULTS = new Set(["gpt-4.1"]);
+const OPENAI_IMAGE_DEFAULTS = new Set(["gpt-image-1", "gpt-image-2"]);
+
 /** Per-provider fallback keys the server operator can configure, mirroring
  * the existing OPENAI_API_KEY pattern -- used when a user hasn't added
  * their own key for whichever provider they've selected. */
@@ -100,9 +114,19 @@ export async function resolveProviderForUser(
     throw new MissingProviderKeyError(provider);
   }
 
+  const defaults = PROVIDER_MODEL_DEFAULTS[provider];
+  const textModel = user?.textModel != null
+    && (provider === "openai" || !OPENAI_TEXT_DEFAULTS.has(user.textModel))
+    ? user.textModel
+    : defaults.text;
+  const imageModel = user?.imageModel != null
+    && (provider === "openai" || !OPENAI_IMAGE_DEFAULTS.has(user.imageModel))
+    ? user.imageModel
+    : defaults.image;
+
   return {
     adapter: ADAPTER_FACTORY[provider](apiKey),
-    textModel: user?.textModel || "gpt-4.1",
-    imageModel: user?.imageModel || "gpt-image-2",
+    textModel,
+    imageModel,
   };
 }
