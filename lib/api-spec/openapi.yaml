@@ -97,6 +97,41 @@ paths:
         "200":
           description: Logged out
 
+  /auth/account:
+    delete:
+      operationId: deleteAccount
+      tags: [auth]
+      summary: Permanently delete the authenticated account and owned data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteAccountInput"
+      responses:
+        "200":
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+        "401":
+          description: Not authenticated or password incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Active subscription could not be cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /auth/me:
     get:
       operationId: getMe
@@ -282,6 +317,41 @@ paths:
                 items:
                   $ref: "#/components/schemas/EditedImage"
 
+  /projects/{id}/transformations:
+    post:
+      operationId: generateTransformations
+      tags: [images]
+      summary: Generate three furniture transformation concepts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransformationInput"
+      responses:
+        "201":
+          description: Three generated transformation concepts
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 3
+                maxItems: 3
+                items:
+                  $ref: "#/components/schemas/EditedImage"
+        "402":
+          description: Trial limit reached or no active subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /projects/{id}/ads:
     get:
       operationId: listProjectAds
@@ -437,6 +507,15 @@ components:
         - email
         - password
 
+    DeleteAccountInput:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 1
+      required:
+        - password
+
     Project:
       type: object
       properties:
@@ -538,7 +617,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [background_removed, staged]
+          enum: [background_removed, staged, transformation]
         imageUrl:
           type: string
         roomStyle:
@@ -562,10 +641,20 @@ components:
         additionalPrompt:
           type: ["string", "null"]
         sourceImageId:
-          type: ["integer", "null"]
-          description: ID of an edited image to use as source (e.g. background-removed). Uses original if null.
+          type: integer
+          description: ID of a generated transformation selected for room staging.
       required:
         - roomStyle
+        - sourceImageId
+
+    TransformationInput:
+      type: object
+      properties:
+        includeModernBase:
+          type: boolean
+          default: false
+          description: Allow one of the three concepts to replace only the existing bottom base or legs with a buildable modern base.
+      required: []
 
     Ad:
       type: object
@@ -609,9 +698,10 @@ components:
         additionalContext:
           type: ["string", "null"]
         imageId:
-          type: ["integer", "null"]
-          description: ID of edited image to feature in the ad. Uses original if null.
-      required: []
+          type: integer
+          description: ID of the staged image to feature in the marketplace ad.
+      required:
+        - imageId
 
     UsageInfo:
       type: object

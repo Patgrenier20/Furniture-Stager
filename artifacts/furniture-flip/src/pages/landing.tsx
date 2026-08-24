@@ -1,8 +1,10 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Camera, Eraser, PenTool, ArrowRight, CheckCircle2 } from "lucide-react";
+import { isAndroidPlayApp } from "@/lib/platform";
 
 export default function Landing() {
+  const isAndroid = isAndroidPlayApp();
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary selection:text-primary-foreground">
       {/* Navbar */}
@@ -14,7 +16,7 @@ export default function Landing() {
         <nav className="hidden md:flex items-center gap-6">
           <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How it Works</a>
           <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
-          <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+          {!isAndroid ? <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a> : null}
         </nav>
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-sm font-medium text-foreground hover:text-primary transition-colors">Log in</Link>
@@ -89,7 +91,7 @@ export default function Landing() {
         </section>
 
         {/* Pricing Preview Section */}
-        <section id="pricing" className="py-24 px-6 max-w-5xl mx-auto">
+        <section id="pricing" className={isAndroid ? "hidden" : "py-24 px-6 max-w-5xl mx-auto"}>
           <div className="text-center mb-16">
             <h2 className="font-serif text-4xl font-bold text-foreground mb-4">Simple, honest pricing</h2>
             <p className="text-muted-foreground text-lg">Basic is limited access. Pro is the full studio with your own model settings and keys.</p>
@@ -149,6 +151,10 @@ export default function Landing() {
           <span className="font-serif font-bold text-lg text-foreground tracking-tight">FurniFlip</span>
         </div>
         <p className="text-muted-foreground text-sm">© {new Date().getFullYear()} FurniFlip. Built for the hustle.</p>
+        <div className="mt-3 flex justify-center gap-4 text-sm">
+          <Link href="/privacy" className="text-primary hover:underline">Privacy</Link>
+          <Link href="/delete-account" className="text-primary hover:underline">Delete account</Link>
+        </div>
       </footer>
     </div>
   );

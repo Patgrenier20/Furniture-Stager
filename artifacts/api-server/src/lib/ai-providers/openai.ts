@@ -26,14 +26,22 @@ export function createOpenAIAdapter(apiKey: string): AiProviderAdapter {
       return content;
     },
 
-    async editImage({ image, prompt, model, size }: ImageEditRequest) {
-      const imageFile = new File([new Uint8Array(image)], "image.png", { type: "image/png" });
+    async editImage({ image, mimeType, prompt, model, size, quality, inputFidelity, background }: ImageEditRequest) {
+      const extension = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/webp" ? "webp" : "png";
+      const imageFile = new File([new Uint8Array(image)], `image.${extension}`, { type: mimeType });
+      const usesAlwaysHighFidelityModel = model === "gpt-image-2" || model.startsWith("gpt-image-2-");
 
       const result = await client.images.edit({
         model,
         image: imageFile,
         prompt,
-        size: (size as "1024x1024" | "1536x1024" | "1024x1536" | "auto" | undefined) ?? "1024x1024",
+        size: size ?? "auto",
+        quality: quality ?? "high",
+        background,
+        // GPT Image 2 always uses high input fidelity and rejects attempts to
+        // configure it. Older full-size GPT Image models default to low, so
+        // explicitly request high fidelity for those models.
+        ...(!usesAlwaysHighFidelityModel ? { input_fidelity: inputFidelity ?? "high" } : {}),
       });
 
       const b64 = result.data?.[0]?.b64_json;

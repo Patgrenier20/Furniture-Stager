@@ -8,7 +8,7 @@ export const editedImagesTable = pgTable("edited_images", {
   projectId: integer("project_id")
     .notNull()
     .references(() => projectsTable.id, { onDelete: "cascade" }),
-  type: text("type").notNull(), // "background_removed" | "staged"
+  type: text("type").notNull(), // "background_removed" | "transformation" | "staged"
   imageUrl: text("image_url").notNull(),
   roomStyle: text("room_style"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

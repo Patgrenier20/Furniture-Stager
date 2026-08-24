@@ -73,28 +73,36 @@ router.post("/projects/:id/ads", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
+  const { price, condition, location, additionalContext, imageId } = req.body;
+
+  if (!Number.isInteger(imageId)) {
+    res.status(400).json({ error: "Stage a selected makeover before generating the marketplace ad." });
+    return;
+  }
+
+  // Ads in the guided workflow must feature the staged result, never an
+  // original upload or an un-staged makeover concept.
+  const [featuredImage] = await db
+    .select()
+    .from(editedImagesTable)
+    .where(and(
+      eq(editedImagesTable.id, imageId),
+      eq(editedImagesTable.projectId, projectId),
+      eq(editedImagesTable.type, "staged"),
+    ));
+
+  if (!featuredImage) {
+    res.status(400).json({ error: "The marketplace ad image must be a staged image from this project." });
+    return;
+  }
+
   const usageCheck = await checkAndIncrementUsage(userId);
   if (!usageCheck.allowed) {
     res.status(402).json({ error: usageCheck.message ?? "Usage limit reached" });
     return;
   }
 
-  const { price, condition, location, additionalContext, imageId } = req.body;
-
   req.log.info({ projectId }, "Generating ad");
-
-  // Determine which image to feature
-  let featuredImageUrl: string | null = null;
-  if (imageId) {
-    const [img] = await db
-      .select()
-      .from(editedImagesTable)
-      .where(and(eq(editedImagesTable.id, imageId), eq(editedImagesTable.projectId, projectId)));
-    if (img) featuredImageUrl = img.imageUrl;
-  }
-  if (!featuredImageUrl) {
-    featuredImageUrl = project.originalImageUrl;
-  }
 
   const conditionLabels: Record<string, string> = {
     like_new: "like new",
@@ -147,7 +155,7 @@ Write an authentic, appealing listing that would attract serious buyers.`;
         price: price ? String(price) : null,
         condition: condition ?? null,
         location: location ?? null,
-        imageUrl: featuredImageUrl,
+        imageUrl: featuredImage.imageUrl,
       })
       .returning();
 

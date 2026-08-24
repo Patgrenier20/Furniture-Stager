@@ -14,6 +14,8 @@ const Studio = lazy(() => import('@/pages/studio'));
 const Pricing = lazy(() => import('@/pages/pricing'));
 const Account = lazy(() => import('@/pages/account'));
 const JourneyPreview = lazy(() => import('@/pages/journey-preview'));
+const PrivacyPolicy = lazy(() => import('@/pages/privacy'));
+const DeleteAccount = lazy(() => import('@/pages/delete-account'));
 const NotFound = lazy(() => import('@/pages/not-found'));
 const Toaster = lazy(() =>
   import('@/components/ui/toaster').then((module) => ({
@@ -67,6 +69,8 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/account" component={Account} />
       <Route path="/journey-preview" component={JourneyPreview} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/delete-account" component={DeleteAccount} />
       <Route component={NotFound} />
     </Switch>
   );

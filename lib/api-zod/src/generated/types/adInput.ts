@@ -15,9 +15,6 @@ export interface AdInput {
   location?: string | null;
   /** @nullable */
   additionalContext?: string | null;
-  /**
-     * ID of edited image to feature in the ad. Uses original if null.
-     * @nullable
-     */
-  imageId?: number | null;
+  /** ID of the staged image to feature in the marketplace ad. */
+  imageId: number;
 }

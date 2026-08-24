@@ -8,7 +8,9 @@ import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import path from "path";
+import { pool } from "@workspace/db";
 import router from "./routes";
 import { handleStripeWebhook } from "./routes/subscriptions";
 import { logger } from "./lib/logger";
@@ -16,6 +18,7 @@ import { requireAuth } from "./middlewares/requireAuth";
 
 const app: Express = express();
 const isProduction = process.env.NODE_ENV === "production";
+const PgSessionStore = connectPgSimple(session);
 const sessionSecret = process.env.SESSION_SECRET ?? "furniflip-dev-secret";
 const allowedOrigins = (process.env.CORS_ORIGIN ?? "")
   .split(",")
@@ -73,6 +76,18 @@ app.use(
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    // Local PGlite development keeps the lightweight in-memory store. Hosted
+    // PostgreSQL deployments persist sessions so restarts and multiple API
+    // replicas do not log users out or disagree about authentication state.
+    ...(pool
+      ? {
+          store: new PgSessionStore({
+            pool,
+            tableName: "user_sessions",
+            createTableIfMissing: false,
+          }),
+        }
+      : {}),
     cookie: {
       secure: isProduction,
       httpOnly: true,

@@ -56,6 +56,12 @@ export interface ImageEditRequest {
   model: string;
   /** Only meaningful to providers with explicit size controls; others ignore it. */
   size?: string;
+  /** Render quality for providers that expose it. */
+  quality?: "low" | "medium" | "high" | "auto";
+  /** Prefer source-image identity over creative reinterpretation when supported. */
+  inputFidelity?: "high" | "low";
+  /** Background behavior for providers/models that expose alpha output. */
+  background?: "transparent" | "opaque" | "auto";
 }
 
 export interface AiProviderAdapter {

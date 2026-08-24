@@ -2,9 +2,11 @@ import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Image as ImageIcon, CreditCard, Settings, LogOut, Loader2, Sparkles } from "lucide-react";
+import { LayoutDashboard, Image as ImageIcon, Settings, LogOut, Loader2, Sparkles } from "lucide-react";
+import { isAndroidPlayApp } from "@/lib/platform";
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
+  const isAndroid = isAndroidPlayApp();
   const [location, setLocation] = useLocation();
   const { data: user, isLoading, isError } = useGetMe();
   const logout = useLogout();
@@ -87,7 +89,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
                 <p className="text-xs text-muted-foreground">
                   {user.trialUsed} / {user.trialLimit} edits used
                 </p>
-                {user.trialUsed >= user.trialLimit && (
+                {user.trialUsed >= user.trialLimit && !isAndroid && (
                   <Link href="/pricing" className="block mt-2">
                     <Button variant="default" size="sm" className="w-full text-xs h-7">Upgrade to Pro</Button>
                   </Link>

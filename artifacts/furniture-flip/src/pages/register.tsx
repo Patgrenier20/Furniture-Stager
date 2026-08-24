@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { useEffect } from "react";
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -20,15 +21,20 @@ export default function Register() {
   const register = useRegister();
   const { toast } = useToast();
 
-  if (!isAuthLoading && user) {
-    setLocation("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (!isAuthLoading && user) {
+      setLocation("/dashboard");
+    }
+  }, [isAuthLoading, user, setLocation]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: "", password: "" },
   });
+
+  if (!isAuthLoading && user) {
+    return null;
+  }
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     register.mutate({ data: values }, {

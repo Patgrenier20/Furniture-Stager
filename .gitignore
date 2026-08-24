@@ -31,6 +31,7 @@ node_modules
 # misc
 /.sass-cache
 /.codex-preview/
+/.playwright-cli/
 /.agents/
 /.codex/
 /connect.lock
@@ -70,5 +71,6 @@ Thumbs.db
 /docs/
 /docs - Copy/
 /private/
+/design-qa.md
 /*.pdf
 /*.zip

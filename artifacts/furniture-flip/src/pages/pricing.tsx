@@ -3,8 +3,10 @@ import { useCreateCheckoutSession, useCreatePortalSession, useGetMe, useGetUsage
 import { DashboardLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, Sparkles, ArrowRight } from "lucide-react";
+import { isAndroidPlayApp } from "@/lib/platform";
 
 export default function Pricing() {
+  const isAndroid = isAndroidPlayApp();
   const { data: usage, isLoading: usageLoading } = useGetUsage();
   const { data: user } = useGetMe();
   const checkoutSession = useCreateCheckoutSession();
@@ -36,6 +38,24 @@ export default function Pricing() {
       <DashboardLayout>
         <div className="flex h-full items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (isAndroid) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto max-w-2xl p-6 md:p-10">
+          <section className="space-y-4 rounded-2xl border bg-card p-8 text-center shadow-sm">
+            <Sparkles className="mx-auto h-8 w-8 text-primary" />
+            <h1 className="font-serif text-3xl font-bold">Your FurniFlip access</h1>
+            <p className="text-muted-foreground">
+              The Android app includes Basic access. If this account already has additional access,
+              it is recognized automatically after you sign in.
+            </p>
+            <Link href="/dashboard"><Button>Return to dashboard</Button></Link>
+          </section>
         </div>
       </DashboardLayout>
     );

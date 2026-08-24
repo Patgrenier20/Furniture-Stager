@@ -12,4 +12,5 @@ export type EditedImageType = typeof EditedImageType[keyof typeof EditedImageTyp
 export const EditedImageType = {
   background_removed: 'background_removed',
   staged: 'staged',
+  transformation: 'transformation',
 } as const;

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useGetMe, customFetch } from "@workspace/api-client-react";
 import { Loader2, KeyRound, BrainCircuit, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 type AiSettings = {
   id: number;
@@ -30,10 +31,10 @@ const MASK = "••••••••";
 
 // Sensible current defaults per provider, so switching the provider dropdown
 // doesn't silently leave an incompatible model name (e.g. OpenAI's
-// "gpt-image-1") in place for a provider that doesn't recognize it. Users can
+// "gpt-image-2") in place for a provider that doesn't recognize it. Users can
 // still freely overwrite these -- they're plain text fields, not a fixed list.
 const PROVIDER_MODEL_DEFAULTS: Record<string, { text: string; image: string; multimodal: string; imageSupported: boolean }> = {
-  openai: { text: "gpt-4.1", image: "gpt-image-1", multimodal: "gpt-4.1", imageSupported: true },
+  openai: { text: "gpt-4.1", image: "gpt-image-2", multimodal: "gpt-4.1", imageSupported: true },
   anthropic: { text: "claude-opus-4-7", image: "", multimodal: "claude-opus-4-7", imageSupported: false },
   google: { text: "gemini-3.5-flash", image: "gemini-3.1-flash-image", multimodal: "gemini-3.5-flash", imageSupported: true },
   xai: { text: "grok-4.3", image: "", multimodal: "grok-4.3", imageSupported: false },
@@ -46,7 +47,7 @@ export default function AccountSettings() {
   const [loading, setLoading] = useState(false);
   const [modelProvider, setModelProvider] = useState("openai");
   const [textModel, setTextModel] = useState("gpt-4.1");
-  const [imageModel, setImageModel] = useState("gpt-image-1");
+  const [imageModel, setImageModel] = useState("gpt-image-2");
   const [multimodalModel, setMultimodalModel] = useState("gpt-4.1");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [anthropicApiKey, setAnthropicApiKey] = useState("");
@@ -80,7 +81,7 @@ export default function AccountSettings() {
   const defaults = useMemo(
     () => ({
       textModel: user?.plan === "pro" ? "gpt-4.1" : "gpt-4.1-mini",
-      imageModel: "gpt-image-1",
+      imageModel: "gpt-image-2",
       multimodalModel: user?.plan === "pro" ? "gpt-4.1" : "gpt-4.1-mini",
     }),
     [user?.plan]
@@ -227,7 +228,7 @@ export default function AccountSettings() {
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Sparkles className="w-4 h-4 text-primary" />
-              <span>Suggested Pro defaults: gpt-4.1 for text and multimodal, gpt-image-1 for images.</span>
+              <span>Suggested Pro defaults: gpt-4.1 for text and multimodal, gpt-image-2 for high-fidelity image edits.</span>
             </div>
           </section>
         </div>
@@ -238,6 +239,17 @@ export default function AccountSettings() {
             Save settings
           </Button>
         </div>
+
+        <section className="rounded-2xl border border-destructive/20 bg-card p-6">
+          <h2 className="font-semibold text-lg">Privacy and account data</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Review how FurniFlip handles your information or permanently delete your account and projects.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/privacy"><Button variant="outline">Privacy policy</Button></Link>
+            <Link href="/delete-account"><Button variant="destructive">Delete account</Button></Link>
+          </div>
+        </section>
       </div>
     </DashboardLayout>
   );

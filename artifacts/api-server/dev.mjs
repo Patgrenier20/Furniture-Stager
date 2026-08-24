@@ -21,4 +21,9 @@ function run(command, args) {
 }
 
 run("pnpm", ["run", "build"]);
-run("node", ["--enable-source-maps", "./dist/index.mjs"]);
+run("node", [
+  "--env-file-if-exists=.env",
+  "--env-file-if-exists=.env.local",
+  "--enable-source-maps",
+  "./dist/index.mjs",
+]);
